@@ -3,228 +3,164 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN V11: BACK TO BASICS ---
-st.set_page_config(layout="wide", page_title="Sniper V11")
-st.title("🎯 Sniper V11 - FINALE")
+# --- CONFIGURACION V12 ---
+st.set_page_config(layout="wide", page_title="SCANNER V11")
+st.title("🎯 SCANNER V11 - FINALE Precisión Máxima")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("1. Configuración")
-    
-    # API KEY
+    st.header("1. Credenciales")
     raw_key = st.text_input("API Key", type="password")
     API_KEY = raw_key.strip() if raw_key else ""
     
-    # CARGAR LIGAS
+    # Carga de Deportes
     if 'sports_data' not in st.session_state:
         st.session_state['sports_data'] = {}
-    
+        
     if st.button("🔄 Cargar Deportes"):
         if not API_KEY:
-            st.error("¡Falta la API Key!")
+            st.error("Falta API Key")
         else:
             try:
-                # Usamos el parámetro correcto 'apiKey'
-                url = f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}"
-                r = requests.get(url)
+                r = requests.get(f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}")
                 data = r.json()
-                
                 if isinstance(data, list):
-                    clean_dict = {}
+                    clean = {}
                     for x in data:
                         if x['active']:
-                            label = f"{x['group']} - {x['title']}"
-                            clean_dict[label] = x['key']
-                    
-                    st.session_state['sports_data'] = clean_dict
-                    st.success(f"¡{len(clean_dict)} Ligas Cargadas!")
+                            l = f"{x['group']} - {x['title']}"
+                            clean[l] = x['key']
+                    st.session_state['sports_data'] = clean
+                    st.success(f"¡{len(clean)} Ligas!")
                 else:
-                    st.error(f"Error API: {data}")
+                    st.error(f"Error: {data}")
             except Exception as e:
                 st.error(f"Error Conexión: {e}")
 
-    # SELECTORES
+    # Filtros
     sport_key = None
     if st.session_state['sports_data']:
-        sorted_list = sorted(st.session_state['sports_data'].keys())
-        selection = st.selectbox("Liga:", sorted_list)
-        sport_key = st.session_state['sports_data'][selection]
-    
-    # REGIONES
+        lista = sorted(st.session_state['sports_data'].keys())
+        sel = st.selectbox("Liga:", lista)
+        sport_key = st.session_state['sports_data'][sel]
+
+    # Regiones
     reg_map = {
         "Global (Todas)": "us,uk,eu,au",
         "Europa (EU)": "eu",
         "USA (US)": "us",
-        "Latam (AU)": "au",
-        "Reino Unido (UK)": "uk"
+        "Latam (AU)": "au"
     }
     region_label = st.selectbox("Región:", list(reg_map.keys()))
-    region_val = reg_map[region_label]
-    
-    # MERCADOS (Ordenados por seguridad)
+    region_code = reg_map[region_label]
+
+    # Mercados (Todos disponibles, aunque la API bloquee algunos)
     st.write("---")
-    st.caption("Selecciona Mercado:")
     market_map = {
-        "🏆 Ganador (H2H) - SEGURO": "h2h",
-        "🏀/🏈 Hándicaps (Spreads)": "spreads",
-        "🔢 Altas/Bajas (Totals)": "totals",
+        "🏆 Ganador (H2H)": "h2h",
+        "🏀/🏈 Hándicaps": "spreads",
+        "🔢 Totales (Alta/Baja)": "totals",
         "⚠️ Doble Oportunidad": "double_chance",
         "⚠️ Empate no Válido": "draw_no_bet"
     }
-    market_label = st.selectbox("Tipo:", list(market_map.keys()))
+    market_label = st.selectbox("Mercado:", list(market_map.keys()))
     market_val = market_map[market_label]
-    
-    min_profit = st.slider("Min % Beneficio:", 0.0, 10.0, 0.0)
-    
-    btn_run = st.button("🚀 BUSCAR AHORA")
-    # --- MOTOR DE BÚSQUEDA ---
-if btn_run and API_KEY and sport_key:
-    with st.spinner(f"Escaneando {market_val}..."):
+
+    min_profit = st.slider("Min %:", 0.0, 10.0, 0.0)
+    btn_buscar = st.button("🔎 BUSCAR")
+    # --- MOTOR LÓGICO ---
+if btn_buscar and API_KEY and sport_key:
+    with st.spinner(f"Escaneando {market_label}..."):
         try:
-            # URL y Parámetros
-            base_url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
+            url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
             params = {
                 'apiKey': API_KEY,
-                'regions': region_val,
-                'markets': market_val, # Aquí es donde fallaba antes
+                'regions': region_code,
+                'markets': market_val,
                 'oddsFormat': 'decimal'
             }
             
-            r = requests.get(base_url, params=params)
+            r = requests.get(url, params=params)
             data = r.json()
             
-            # --- PROTECCIÓN CONTRA ERRORES DE MERCADO ---
+            # 1. Filtro de Error de API (Si el mercado está bloqueado)
             if isinstance(data, dict) and 'message' in data:
-                # Si la API devuelve un mensaje de error en lugar de una lista
                 msg = data['message']
-                if 'INVALID_MARKET' in str(data) or 'not supported' in msg:
-                    st.error(f"🚫 ERROR DE MERCADO: La API dice: '{msg}'")
-                    st.warning("💡 SOLUCIÓN: Este deporte no soporta 'Doble Oportunidad' o 'Empate no Válido' en tu plan actual. Por favor selecciona 'Ganador (H2H)' o 'Hándicaps'.")
-                    st.stop() # Detiene la ejecución limpiamente
-                else:
-                    st.error(f"Error de API: {msg}")
+                if 'not supported' in msg or 'INVALID_MARKET' in str(data):
+                    st.error(f"🚫 BLOQUEADO: Tu plan de API no permite '{market_label}'.")
+                    st.info("💡 Solución: Usa Ganador (H2H), Hándicaps o Totales.")
                     st.stop()
-
-            # --- PROCESAMIENTO NORMAL ---
+            
+            # 2. Procesamiento de Oportunidades
             if isinstance(data, list):
-                opps = []
+                oportunidades = []
+                
                 for ev in data:
-                    # Datos Evento
-                    home = ev['home_team']
-                    away = ev['away_team']
-                    titulo = f"{home} vs {away}"
+                    fecha = ev.get('commence_time','').replace('T',' ').replace('Z','')
+                    evento = f"{ev['home_team']} vs {ev['away_team']}"
                     
-                    # Fecha
-                    raw_d = ev.get('commence_time', '')
-                    fecha = raw_d.replace('T', ' ').replace('Z', '')
-
-                    # Agrupar cuotas
-                    cuotas = {}
+                    # AGRUPAMIENTO INTELIGENTE (Crucial para Spreads/Totals)
+                    # Agrupamos por 'point'. Ej: Todas las cuotas de Over 210.5 juntas.
+                    # Si es H2H, el punto es 'Moneyline'.
+                    grupos = {}
+                    
                     for book in ev['bookmakers']:
                         for m in book['markets']:
                             if m['key'] == market_val:
                                 for out in m['outcomes']:
-                                    # Truco: Usar 'name' para H2H, 'point' para Spreads/Totals
-                                    if market_val in ['spreads', 'totals']:
-                                        key = f"{out.get('point', '')}" # Ej: 2.5
-                                        if not key: key = out['name']
-                                    else:
-                                        key = out['name'] # Ej: Real Madrid
+                                    # La clave es el punto (ej: 2.5) o 'Main' si no tiene punto
+                                    punto = out.get('point', 'Moneyline')
                                     
-                                    if key not in cuotas: cuotas[key] = []
+                                    if punto not in grupos: grupos[punto] = []
                                     
-                                    cuotas[key].append({
+                                    grupos[punto].append({
                                         'bookie': book['title'],
-                                        'price': out['price'],
-                                        'name': out['name']
+                                        'name': out['name'],
+                                        'price': out['price']
                                     })
                     
-                    # Buscar Arbitraje
-                    for seleccion, lista_bookies in cuotas.items():
-                        # 1. Mejor cuota por opción
-                        best = {} # { 'Real Madrid': {data}, 'Barcelona': {data} }
+                    # ANALISIS DE ARBITRAJE POR GRUPO
+                    for pt, lista_cuotas in grupos.items():
+                        # Buscar la MEJOR cuota para cada opción (ej: Mejor Over y Mejor Under)
+                        mejor_por_opcion = {}
+                        for item in lista_cuotas:
+                            nombre_opcion = item['name']
+                            if nombre_opcion not in mejor_por_opcion:
+                                mejor_por_opcion[nombre_opcion] = item
+                            else:
+                                if item['price'] > mejor_por_opcion[nombre_opcion]['price']:
+                                    mejor_por_opcion[nombre_opcion] = item
                         
-                        # Si es spreads/totals, la "selección" es el punto (ej 2.5).
-                        # Necesitamos comparar Over vs Under para ese punto.
-                        # Si es H2H, la "selección" es el nombre del equipo, necesitamos comparar vs el Rival.
-                        
-                        # Simplificación V11: Agrupamos por MERCADO entero para H2H
-                        # Y por PUNTO para Spreads/Totals
-                        
-                        if market_val in ['spreads', 'totals']:
-                            # Ya estamos dentro de un bucle de puntos (seleccion = 2.5)
-                            # Necesitamos encontrar el mejor Over y el mejor Under para este punto
-                            pass 
-                        
-                        # RE-LOGICA V11 SIMPLIFICADA (ESTILO V1)
-                        # Iteramos sobre todo el mercado del evento para encontrar las mejores cuotas de cada resultado posible
-                        best_odds = {}
-                        for book in ev['bookmakers']:
-                            for m in book['markets']:
-                                if m['key'] == market_val:
-                                    for out in m['outcomes']:
-                                        # Identificador único de la opción (ej: Over 2.5)
-                                        op_name = out['name']
-                                        op_point = out.get('point', '')
-                                        
-                                        # Para spreads/totals, necesitamos agrupar por punto
-                                        unique_id = op_name
-                                        if op_point: unique_id = f"{op_name} {op_point}"
-                                        
-                                        # Guardar mejor cuota
-                                        if unique_id not in best_odds or out['price'] > best_odds[unique_id]['price']:
-                                            best_odds[unique_id] = {
-                                                'price': out['price'],
-                                                'bookie': book['title'],
-                                                'name': unique_id,
-                                                'point': op_point
-                                            }
-                        
-                        # Ahora verificamos si tenemos un set completo para arbitraje
-                        # Esto es complejo de generalizar, así que usaremos la suma bruta si son grupos compatibles
-                        # (Esta parte puede dar falsos positivos si mezcla peras con manzanas, pero V1 lo hacía así y funcionaba)
-                        
-                        # FILTRO INTELIGENTE:
-                        # Solo comparamos si tienen el MISMO punto (para totals/spreads)
-                        grupos_comparacion = {}
-                        for k, v in best_odds.items():
-                            pt = v.get('point', 'Main')
-                            if pt not in grupos_comparacion: grupos_comparacion[pt] = []
-                            grupos_comparacion[pt].append(v)
-                        
-                        for pt, odds_list in grupos_comparacion.items():
-                            if len(odds_list) >= 2:
-                                # Calcular arbitraje
-                                suma = sum(1/o['price'] for o in odds_list)
-                                if suma < 1.0:
-                                    # VALIDACIÓN FINAL: No apostar a lo mismo (ej: Over vs Over)
-                                    nombres = [o['name'] for o in odds_list]
-                                    es_valido = True
-                                    if market_val == 'h2h' and len(odds_list) < 2: es_valido = False
-                                    # Evitar comparar Over 2.5 vs Over 2.5 (debe ser Over vs Under)
-                                    if market_val == 'totals' and 'Over' in nombres[0] and 'Over' in nombres[1]: es_valido = False
+                        # Validar si hay suficientes lados para apostar
+                        # Minimo 2 lados (A vs B)
+                        if len(mejor_por_opcion) >= 2:
+                            finales = list(mejor_por_opcion.values())
+                            suma_arb = sum(1/x['price'] for x in finales)
+                            
+                            # ¿Es rentable?
+                            if suma_arb < 1.0:
+                                beneficio = (1 - suma_arb) / suma_arb * 100
+                                
+                                if beneficio >= min_profit:
+                                    # Texto de apuesta
+                                    txt = " | ".join([f"{x['name']} ({x['bookie']}) @ {x['price']}" for x in finales])
                                     
-                                    if es_valido:
-                                        ben = (1 - suma) / suma * 100
-                                        if ben >= min_profit:
-                                            # Formatear
-                                            txt = " | ".join([f"{x['name']} ({x['bookie']}) @ {x['price']}" for x in odds_list])
-                                            opps.append({
-                                                "Fecha": fecha,
-                                                "Evento": titulo,
-                                                "Mdo": f"{market_val} {pt}",
-                                                "Beneficio": f"{ben:.2f}%",
-                                                "Apuestas": txt
-                                            })
-
-                if opps:
-                    st.success(f"¡{len(opps)} Oportunidades!")
-                    st.dataframe(pd.DataFrame(opps), use_container_width=True)
-                else:
-                    st.warning("No se encontraron surebets con estos filtros.")
+                                    oportunidades.append({
+                                        "Fecha": fecha,
+                                        "Evento": evento,
+                                        "Selección": pt, # Muestra el Handicap o Total
+                                        "Beneficio": f"{beneficio:.2f}%",
+                                        "Apuestas": txt
+                                    })
                 
-                with st.expander("Ver Datos Crudos"):
+                if oportunidades:
+                    st.success(f"¡{len(oportunidades)} Oportunidades!")
+                    st.dataframe(pd.DataFrame(oportunidades), use_container_width=True)
+                else:
+                    st.warning("No hay oportunidades ahora mismo.")
+                
+                with st.expander("Debug"):
                     st.json(data)
 
         except Exception as e:
-            st.error(f"Error Crítico: {e}")
+            st.error(f"Error: {e}")
