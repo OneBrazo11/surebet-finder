@@ -3,9 +3,9 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN V14.2: BET365 + DAZN ---
-st.set_page_config(layout="wide", page_title="Sniper V14 - Ecuador")
-st.title("SCANNER V11.29 - FINALE FINALE")
+# --- CONFIGURACIÓN V15: ECUADOR PRO (USDT/SKRILL) ---
+st.set_page_config(layout="wide", page_title="Sniper V11.29 - Pro")
+st.title("🇪🇨 SCANNER V11.29 - Ecuador Pro (USDT/Skrill)")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -13,7 +13,17 @@ with st.sidebar:
     raw_key = st.text_input("API Key", type="password")
     API_KEY = raw_key.strip() if raw_key else ""
     
-    # Carga Inicial
+    # CHECKER DE CREDITOS (Tu herramienta Pro)
+    if API_KEY:
+        if st.button("💰 Ver Saldo API"):
+            try:
+                r = requests.get(f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}")
+                if r.status_code == 200:
+                    st.success(f"Te quedan: **{r.headers.get('x-requests-remaining')}**")
+                else: st.error("Error de clave")
+            except: pass
+
+    # CARGA DEPORTES
     if 'sports_data' not in st.session_state:
         st.session_state['sports_data'] = {}
 
@@ -25,46 +35,53 @@ with st.sidebar:
                 if isinstance(data, list):
                     clean = {f"{x['group']} - {x['title']}": x['key'] for x in data if x['active']}
                     st.session_state['sports_data'] = clean
-                    st.success("¡Deportes Actualizados!")
-                else:
-                    st.error(f"Error: {data}")
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    st.success("¡Listo!")
+                else: st.error(f"Error: {data}")
+            except Exception as e: st.error(f"Error: {e}")
 
-    # --- SELECTOR DE DEPORTE ---
+    # SELECTOR DE LIGA
     sport_key = None
     if st.session_state['sports_data']:
         lista = sorted(st.session_state['sports_data'].keys())
         sel = st.selectbox("Liga:", lista)
         sport_key = st.session_state['sports_data'][sel]
 
-    # --- FILTRO DE CASAS ---
-    st.header("2. Tus Casas")
+    # --- 2. TUS CASAS (ARSENAL V15) ---
+    st.header("2. Casas Activas")
     
-    # Lista ampliada con DAZN Bet
+    # Lista Maestra (Solo las que sirven en Ecuador/Latam + Cripto)
     casas_posibles = [
-        "Pinnacle", "1xBet", "Betsson", "Betway", "BetOnline.ag", 
-        "Betfair", "Marathon Bet", "Coolbet", "William Hill", 
-        "Matchbook", "888sport", "Bet365", "DAZN Bet", 
-        "BetOnline.ag", "Smarkets", "Dafabet", "Nordic Bet", "LeoVegas" , 
-        "BetUS" , "MyBookie.ag" , "LowVig.ag" , "Matchbook" , "Smarkets"
+        "Pinnacle",       # El Rey (Cuotas base)
+        "BetOnline.ag",   # El Rey del USDT (Alta liquidez)
+        "Betfair",        # Exchange (Skrill/Neteller)
+        "1xBet",          # Clásica Latam
+        "Bet365",         # La más popular
+        "Betsson",        # Muy sólida en Ecuador
+        "Betway",         # Confiable
+        "Marathon Bet",   # Cuotas altas
+        "Coolbet",        # Buena interfaz
+        "William Hill",   # Clásica seria (Skrill)
+        "888sport",       # Buena para empezar
+        "Matchbook",      # Exchange alternativo
+        "LeoVegas",       # Nueva en Latam
+        "LowVig.ag",      # Comisiones bajas (USDT)
+        "MyBookie.ag",    # Bonos cripto
+        "DAZN Bet"        # Competitiva
     ]
     
-    # SELECCIÓN AUTOMÁTICA (Incluye Bet365 y DAZN Bet)
+    # SELECCIÓN AUTOMÁTICA (Las "Titulares")
     default_ecuador = [
-        "Pinnacle", "1xBet", "Bet365", "Betsson", 
-        "Betway", "Unibet", "Marathon Bet", "Coolbet", "DAZN Bet"
+        "Pinnacle", "BetOnline.ag", "1xBet", "Bet365", 
+        "Betsson", "Betway", "Marathon Bet", "Betfair"
     ]
     
     mis_casas = st.multiselect(
-        "Casas Activas:", 
+        "Filtrar Casas:", 
         options=casas_posibles, 
         default=default_ecuador
     )
     
-    st.caption(f"Buscando en {len(mis_casas)} casas seleccionadas.")
-
-    # --- RESTO DE FILTROS ---
+    # --- 3. MERCADO ---
     st.header("3. Mercado")
     market_map = {
         "🏆 Ganador (H2H)": "h2h",
@@ -76,16 +93,14 @@ with st.sidebar:
     m_label = st.selectbox("Tipo:", list(market_map.keys()))
     m_val = market_map[m_label]
     
-    min_profit = st.slider("Min %:", 0.0, 10.0, 0.0)
-    btn_buscar = st.button("🔎 BUSCAR OPORTUNIDADES")
-    # --- BLOQUE 2: MOTOR LÓGICO Y MATEMÁTICO ---
-
+    min_profit = st.slider("Ganancia Mínima %:", 0.0, 10.0, 0.0)
+    btn_buscar = st.button("🚀 BUSCAR SUREBETS")
+    # --- BLOQUE 2: MOTOR LÓGICO Y CÁLCULO ---
 if btn_buscar and API_KEY and sport_key:
-    # Usamos región GLOBAL para asegurar que salgan todas (Pinnacle, Bet365, etc)
-    # El filtro lo haremos nosotros manualmente abajo con tu selección.
+    # Usamos región GLOBAL para traer Pinnacle (EU) y BetOnline (US) a la vez
     region_code = "us,uk,eu,au" 
     
-    with st.spinner(f"Escaneando {sport_key} en busca de oportunidades..."):
+    with st.spinner(f"Escaneando {sport_key}..."):
         try:
             url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
             params = {
@@ -98,10 +113,10 @@ if btn_buscar and API_KEY and sport_key:
             r = requests.get(url, params=params)
             data = r.json()
             
-            # 1. Validación de Error de API (Bloqueo de mercado)
+            # 1. Validación de Error de API (Mercados bloqueados)
             if isinstance(data, dict) and 'message' in data:
                 if 'not supported' in data['message']:
-                    st.error(f"🚫 ERROR: El mercado '{m_label}' no está disponible para este deporte o tu plan.")
+                    st.error(f"🚫 ERROR: El mercado '{m_label}' no está disponible.")
                     st.info("💡 Intenta con 'Ganador (H2H)' o 'Hándicaps'.")
                     st.stop()
             
@@ -110,7 +125,6 @@ if btn_buscar and API_KEY and sport_key:
                 oportunidades = []
                 
                 for ev in data:
-                    # Limpieza de fecha
                     fecha = ev.get('commence_time','').replace('T',' ').replace('Z','')
                     evento = f"{ev['home_team']} vs {ev['away_team']}"
                     
@@ -120,23 +134,22 @@ if btn_buscar and API_KEY and sport_key:
                     for book in ev['bookmakers']:
                         casa_nombre = book['title']
                         
-                        # === FILTRO DE CASAS ===
-                        # Solo procesamos si la casa está en tu lista 'mis_casas'
+                        # === EL FILTRO DE TUS CASAS ===
                         es_permitida = False
                         for permitido in mis_casas:
-                            # Usamos coincidencia parcial (ej: "Unibet" acepta "Unibet (UK)")
+                            # Coincidencia flexible (ej: "Unibet" acepta "Unibet (UK)")
                             if permitido.lower() in casa_nombre.lower():
                                 es_permitida = True
                                 break
                         
                         if not es_permitida:
-                            continue # Si no está en tu lista, la ignoramos
+                            continue # Si no es de tus casas, la ignoramos
                             
-                        # Si pasa el filtro, extraemos sus cuotas
+                        # Extraer cuotas
                         for m in book['markets']:
                             if m['key'] == m_val:
                                 for out in m['outcomes']:
-                                    # Agrupamos por Punto (para Totales/Handicaps) o 'Moneyline'
+                                    # Agrupar por Punto (para Totales/Handicaps) o 'Moneyline'
                                     pt = out.get('point', 'Moneyline')
                                     
                                     if pt not in grupos: grupos[pt] = []
@@ -149,19 +162,19 @@ if btn_buscar and API_KEY and sport_key:
                     
                     # --- FASE B: CÁLCULO DE SUREBETS ---
                     for pt, cuotas in grupos.items():
-                        # 1. Encontrar la MEJOR cuota para cada resultado posible
+                        # Buscar la MEJOR cuota para cada opción
                         mejor_opcion = {}
                         for c in cuotas:
                             sel = c['name']
                             if sel not in mejor_opcion or c['price'] > mejor_opcion[sel]['price']:
                                 mejor_opcion[sel] = c
                         
-                        # 2. Verificar si tenemos suficientes lados (mínimo 2)
+                        # Verificar si hay suficientes lados (mínimo 2)
                         if len(mejor_opcion) >= 2:
                             finales = list(mejor_opcion.values())
                             suma_inversa = sum(1/x['price'] for x in finales)
                             
-                            # 3. Fórmula de Arbitraje (Suma < 1.0 = Ganancia)
+                            # Fórmula de Arbitraje
                             if suma_inversa < 1.0:
                                 ben = (1 - suma_inversa) / suma_inversa * 100
                                 
@@ -173,7 +186,7 @@ if btn_buscar and API_KEY and sport_key:
                                         es_valido = False
                                     
                                     if es_valido:
-                                        # Formato visual de la apuesta
+                                        # Formato visual
                                         detalles = " | ".join([f"{x['name']} ({x['bookie']}) @ {x['price']}" for x in finales])
                                         
                                         oportunidades.append({
