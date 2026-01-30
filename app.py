@@ -3,137 +3,140 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- 1. CONFIGURACIÓN INICIAL ---
 st.set_page_config(
-    page_title="Pixel Trader Sniper V8.2", 
+    page_title="Pixel Trader V8.3", 
     layout="wide"
 )
 st.title("🚀 Pixel Trader Sniper - Estación de Trabajo")
 
-# --- BARRA LATERAL ---
+# --- 2. BARRA LATERAL ---
 with st.sidebar:
-    st.header("1. Credenciales")
+    st.header("Credenciales")
     API_KEY = st.text_input("Tu API Key", type="password")
     
-    # --- CALCULADORA 1: STAKES ---
-    with st.expander("🧮 Calculadora de Stakes", expanded=True):
-        st.caption("Calcula cuánto apostar.")
+    # --- CALCULADORA DE STAKES ---
+    with st.expander("🧮 Calculadora Stakes", expanded=True):
+        radio_opts = [
+            "2 Opciones (Tenis/DNB)", 
+            "3 Opciones (1X2 Fútbol)"
+        ]
+        calc_mode = st.radio("Modo:", radio_opts)
         
-        opciones = ["2 Opciones (Tenis/DNB)", "3 Opciones (1X2 Fútbol)"]
-        calc_mode = st.radio("Tipo:", opciones)
+        bank = st.number_input("Banco Total ($)", value=100.0)
         
-        total_bank = st.number_input("Inversión Total ($)", value=100.0, step=10.0)
-        
-        if calc_mode == opciones[0]: # 2 Opciones
-            c1 = st.number_input("Cuota A", value=2.00, step=0.01)
-            c2 = st.number_input("Cuota B", value=2.00, step=0.01)
+        if calc_mode == radio_opts[0]:
+            # MODO 2 OPCIONES
+            c1 = st.number_input("Cuota A", value=2.0)
+            c2 = st.number_input("Cuota B", value=2.0)
             
             if c1 > 0 and c2 > 0:
-                arb_perc = (1/c1 + 1/c2) * 100
-                profit = (total_bank / (arb_perc/100)) - total_bank
+                inversa = (1/c1 + 1/c2)
+                arb_perc = inversa * 100
+                profit = (bank / inversa) - bank
                 
-                # Formateo seguro de texto
-                txt_ganancia = f"${profit:.2f}"
-                st.markdown(f"**Beneficio:** :green[{txt_ganancia}]")
+                txt_prof = f"${profit:.2f}"
+                st.markdown(f"**Ganancia:** :green[{txt_prof}]")
                 
-                s1 = (total_bank * (1/c1)) / (arb_perc/100)
-                s2 = (total_bank * (1/c2)) / (arb_perc/100)
+                s1 = (bank * (1/c1)) / inversa
+                s2 = (bank * (1/c2)) / inversa
                 
-                st.write("---")
-                k1, k2 = st.columns(2)
-                k1.metric("Apuesta A", f"${s1:.2f}")
-                k2.metric("Apuesta B", f"${s2:.2f}")
-                
-                st.info(f"💡 Redondea a: ${int(s1)} y ${int(s2)}")
+                cA, cB = st.columns(2)
+                cA.metric("Apuesta A", f"${s1:.2f}")
+                cB.metric("Apuesta B", f"${s2:.2f}")
 
-        else: # 3 Opciones
-            c1 = st.number_input("Cuota 1 (Local)", value=2.50)
-            c2 = st.number_input("Cuota X (Empate)", value=3.20)
-            c3 = st.number_input("Cuota 2 (Visita)", value=3.00)
+        else:
+            # MODO 3 OPCIONES
+            c1 = st.number_input("Local", value=2.5)
+            c2 = st.number_input("Empate", value=3.2)
+            c3 = st.number_input("Visita", value=3.0)
             
             if c1 > 0 and c2 > 0 and c3 > 0:
-                arb_perc = (1/c1 + 1/c2 + 1/c3) * 100
-                profit = (total_bank / (arb_perc/100)) - total_bank
+                inversa = (1/c1 + 1/c2 + 1/c3)
+                arb_perc = inversa * 100
+                profit = (bank / inversa) - bank
                 
-                txt_ganancia = f"${profit:.2f}"
-                st.markdown(f"**Beneficio:** :green[{txt_ganancia}]")
+                txt_prof = f"${profit:.2f}"
+                st.markdown(f"**Ganancia:** :green[{txt_prof}]")
                 
-                s1 = (total_bank * (1/c1)) / (arb_perc/100)
-                s2 = (total_bank * (1/c2)) / (arb_perc/100)
-                s3 = (total_bank * (1/c3)) / (arb_perc/100)
+                s1 = (bank * (1/c1)) / inversa
+                s2 = (bank * (1/c2)) / inversa
+                s3 = (bank * (1/c3)) / inversa
                 
-                st.write("---")
-                ka, kb, kc = st.columns(3)
-                ka.metric("Local", f"${s1:.2f}")
-                kb.metric("Empate", f"${s2:.2f}")
-                kc.metric("Visita", f"${s3:.2f}")
+                cA, cB, cC = st.columns(3)
+                cA.metric("L", f"${s1:.2f}")
+                cB.metric("E", f"${s2:.2f}")
+                cC.metric("V", f"${s3:.2f}")
 
-    # --- CALCULADORA 2: INTERÉS COMPUESTO ---
+    # --- PROYECCIÓN INTERÉS COMPUESTO ---
     with st.expander("📈 Proyección", expanded=False):
-        st.caption("Interés compuesto diario.")
-        
-        ini_cap = st.number_input("Inicio ($)", value=50.0)
-        yield_d = st.number_input("Rentabilidad Diaria (%)", value=1.5)
+        ini = st.number_input("Inicio", value=50.0)
+        yield_d = st.number_input("Rentabilidad %", value=1.5)
         dias = st.slider("Días", 30, 365, 30)
         
-        fin_cap = ini_cap * ((1 + yield_d/100) ** dias)
-        ganancia_neta = fin_cap - ini_cap
+        # Cálculos partidos para evitar líneas largas
+        factor = (1 + yield_d/100)
+        final = ini * (factor ** dias)
+        neto = final - ini
         
-        # Formateo seguro para evitar cortes
-        txt_final = f"${fin_cap:,.2f}"
-        txt_neto = f"${ganancia_neta:,.2f}"
-        delta_perc = f"{((fin_cap/ini_cap)-1)*100:.0f}%"
+        txt_fin = f"${final:,.2f}"
+        txt_net = f"${neto:,.2f}"
         
-        st.metric("Capital Final", txt_final)
-        st.metric("Ganancia Neta", txt_neto, delta=delta_perc)
-        
-        # Gráfico
-        datos_grafico = {
-            'Día': range(dias + 1),
-            'Capital': [ini_cap * ((1 + yield_d/100) ** d) for d in range(dias + 1)]
-        }
-        st.line_chart(pd.DataFrame(datos_grafico), x='Día', y='Capital')
+        st.metric("Final", txt_fin)
+        st.metric("Ganancia", txt_net)
 
-    # --- ACTUALIZAR LIGAS ---
-    st.header("2. Escáner")
+    # --- BOTÓN ACTUALIZAR LIGAS ---
+    st.header("Escáner")
+    
+    # Inicializar estado
     if 'sports_list' not in st.session_state:
         st.session_state['sports_list'] = {}
 
     if API_KEY:
         if st.button("🔄 Actualizar Ligas"):
             try:
-                base = "https://api.the-odds-api.com/v4/sports/"
-                r = requests.get(f"{base}?api_key={API_KEY}")
-                r.raise_for_status()
-                data = r.json()
+                # URL partida
+                host = "https://api.the-odds-api.com"
+                path = "/v4/sports/"
+                full_url = f"{host}{path}"
+                
+                res = requests.get(f"{full_url}?api_key={API_KEY}")
+                data = res.json()
                 
                 if isinstance(data, list):
-                    st.session_state['sports_list'] = {
-                        f"{x['group']} - {x['title']}": x['key'] 
-                        for x in data if x['active']
+                    # Diccionario por comprensión vertical
+                    new_list = {
+                        f"{x['group']} - {x['title']}": x['key']
+                        for x in data 
+                        if x['active']
                     }
-                    st.success("¡Ligas cargadas!")
+                    st.session_state['sports_list'] = new_list
+                    st.success("¡Listo!")
                 else:
                     st.error(f"Error API: {data}")
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # --- FILTROS DE BÚSQUEDA ---
+    # --- FILTROS ---
     if st.session_state['sports_list']:
-        lista_ordenada = sorted(st.session_state['sports_list'].keys())
-        sel_label = st.selectbox("Liga:", lista_ordenada)
-        sport_key = st.session_state['sports_list'][sel_label]
+        keys = sorted(st.session_state['sports_list'].keys())
+        sel = st.selectbox("Liga:", keys)
+        sport_key = st.session_state['sports_list'][sel]
     else:
         sport_key = None
 
-    reg_opts = ["Global (Todas)", "Europa (EU)", "USA (US)", "Latam (AU)"]
-    region_mode = st.selectbox("Región", reg_opts)
+    regiones = [
+        "Global (Todas)", 
+        "Europa (EU)", 
+        "USA (US)", 
+        "Latam (AU)"
+    ]
+    region_mode = st.selectbox("Región", regiones)
     
-    # Mapa de regiones
     mapa_reg = {
-        "Global (Todas)": "us,uk,eu,au", 
-        "Europa (EU)": "eu", 
-        "USA (US)": "us", 
+        "Global (Todas)": "us,uk,eu,au",
+        "Europa (EU)": "eu",
+        "USA (US)": "us",
         "Latam (AU)": "au"
     }
     
@@ -144,21 +147,143 @@ with st.sidebar:
         "draw_no_bet", 
         "double_chance"
     ]
-    market_type = st.selectbox("Mercado", mercados)
+    m_type = st.selectbox("Mercado", mercados)
     
-    min_profit = st.slider("Min. Beneficio (%)", 0.0, 10.0, 0.0) 
+    min_p = st.slider("Min %", 0.0, 10.0, 0.0) 
     
-    run_analysis = st.button("🔎 Buscar Surebets")
+    btn_scan = st.button("🔎 Buscar")
 
-# --- MOTOR DE BÚSQUEDA ---
-def procesar_evento(bookmakers, m_name):
-    # Agrupar cuotas
-    grouped = {}
+# --- 3. LÓGICA DEL ESCÁNER ---
+def procesar(bookmakers, mercado):
+    agrupado = {}
+    
     for book in bookmakers:
-        for market in book['markets']:
-            if market['key'] == m_name:
-                for outcome in market['outcomes']:
-                    name = outcome['name']
-                    price = outcome['price']
-                    # Usamos point o Moneyline
-                    point = outcome.get('point',
+        for m in book['markets']:
+            if m['key'] == mercado:
+                for out in m['outcomes']:
+                    nombre = out['name']
+                    precio = out['price']
+                    punto = out.get('point', 'Moneyline')
+                    
+                    if punto not in agrupado:
+                        agrupado[punto] = []
+                    
+                    item = {
+                        'bookie': book['title'],
+                        'name': nombre,
+                        'price': precio
+                    }
+                    agrupado[punto].append(item)
+    
+    resultados = []
+    
+    for pt, opciones in agrupado.items():
+        mejor = {}
+        for op in opciones:
+            nom = op['name']
+            curr_p = op['price']
+            
+            if nom not in mejor or curr_p > mejor[nom]['price']:
+                mejor[nom] = op
+        
+        if len(mejor) >= 2:
+            lados = list(mejor.values())
+            suma_arb = sum(1/x['price'] for x in lados)
+            
+            valido = False
+            if suma_arb < 1.0:
+                # Condiciones partidas para no cortar línea
+                c1 = (mercado == 'h2h' and len(mejor) == 3)
+                c2 = (mercado == 'double_chance' and len(mejor) >= 3)
+                c3 = (mercado in ['spreads', 'totals', 'draw_no_bet'])
+                c4 = (mercado == 'h2h' and len(mejor) == 2)
+                
+                if c1 or c2 or c3 or c4:
+                    valido = True
+            
+            if valido:
+                margen = (1 - suma_arb) / suma_arb * 100
+                if margen >= min_p:
+                    # Crear texto de apuestas verticalmente
+                    txt_bets = []
+                    for s in lados:
+                        b_name = s['bookie']
+                        b_odds = s['price']
+                        b_sel = s['name']
+                        txt_bets.append(f"{b_sel}: {b_name} @ {b_odds}")
+                    
+                    resultados.append({
+                        "Mercado": mercado,
+                        "Selección": pt,
+                        "Beneficio %": round(margen, 2),
+                        "Apuestas": " | ".join(txt_bets)
+                    })
+    return resultados
+
+# --- 4. EJECUCIÓN ---
+if btn_scan and API_KEY and sport_key:
+    with st.spinner(f"Analizando {sport_key}..."):
+        try:
+            # URL construida por partes
+            host = "https://api.the-odds-api.com"
+            path = f"/v4/sports/{sport_key}/odds"
+            url_final = f"{host}{path}"
+            
+            mis_params = {
+                'api_key': API_KEY,
+                'regions': mapa_reg[region_mode],
+                'markets': m_type,
+                'oddsFormat': 'decimal'
+            }
+            
+            r = requests.get(url_final, params=mis_params)
+            data = r.json()
+            
+            # Protección contra error de API
+            if not isinstance(data, list):
+                st.error(f"API Error: {data}")
+            else:
+                final_rows = []
+                for ev in data:
+                    home = ev['home_team']
+                    away = ev['away_team']
+                    titulo = f"{home} vs {away}"
+                    
+                    # Fecha segura
+                    raw_d = ev.get('commence_time', '')
+                    try:
+                        f_fmt = "%Y-%m-%dT%H:%M:%SZ"
+                        obj_d = datetime.strptime(raw_d, f_fmt)
+                        fecha = obj_d.strftime("%Y-%m-%d %H:%M")
+                    except:
+                        fecha = raw_d
+
+                    gaps = procesar(ev['bookmakers'], m_type)
+                    
+                    for g in gaps:
+                        g['Evento'] = titulo
+                        g['Fecha'] = fecha
+                        final_rows.append(g)
+                
+                if final_rows:
+                    st.success(f"{len(final_rows)} Oportunidades")
+                    df = pd.DataFrame(final_rows)
+                    
+                    # Columnas definidas verticalmente
+                    cols = [
+                        'Fecha',
+                        'Evento',
+                        'Mercado',
+                        'Beneficio %',
+                        'Apuestas'
+                    ]
+                    
+                    st.dataframe(df[cols], use_container_width=True)
+                else:
+                    st.warning("Sin oportunidades.")
+                
+                with st.expander("Debug"):
+                    st.json(data)
+
+        except Exception as e:
+            st.error(f"Error Python: {e}")
