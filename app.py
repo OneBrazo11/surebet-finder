@@ -4,8 +4,8 @@ import pandas as pd
 from datetime import datetime
 
 # --- CONFIGURACIÓN BÁSICA ---
-st.set_page_config(layout="wide", page_title="Sniper V10")
-st.title("🎯 Sniper V10 - Back to Basics")
+st.set_page_config(layout="wide", page_title="Sniper V11")
+st.title("🎯 Sniper V11 - FINALE")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -31,7 +31,6 @@ with st.sidebar:
                 data = r.json()
                 
                 if isinstance(data, list):
-                    # Limpiamos la lista
                     clean_dict = {}
                     for x in data:
                         if x['active']:
@@ -52,7 +51,7 @@ with st.sidebar:
         selection = st.selectbox("Liga / Deporte:", sorted_list)
         sport_key = st.session_state['sports_data'][selection]
     
-    # Regiones (Mapeo manual para búsqueda global)
+    # Regiones
     reg_map = {
         "Global (Todas)": "us,uk,eu,au",
         "Europa (EU)": "eu",
@@ -75,8 +74,7 @@ with st.sidebar:
     min_profit = st.slider("Beneficio Min %:", 0.0, 10.0, 0.0)
     
     btn_run = st.button("🔎 BUSCAR AHORA")
-
-# --- LÓGICA PURA (Back to Basics) ---
+    # --- LÓGICA PURA ---
 if btn_run and API_KEY and sport_key:
     with st.spinner("Escaneando mercado..."):
         try:
@@ -106,25 +104,19 @@ if btn_run and API_KEY and sport_key:
                     raw_date = event.get('commence_time', '')
                     fecha = raw_date.replace('T', ' ').replace('Z', '')
                     
-                    # Agrupar cuotas (Lógica Universal)
-                    # Clave: Puede ser el nombre del equipo O el punto (para totales/handicaps)
+                    # Agrupar cuotas
                     grouped_odds = {}
                     
                     for book in event['bookmakers']:
                         for m in book['markets']:
                             if m['key'] == market_val:
                                 for out in m['outcomes']:
-                                    # Para spreads/totals usamos el 'point' como agrupador
-                                    # Para h2h/dnb usamos el 'name' o una clave genérica
-                                    
-                                    # TRUCO: Si es totals/spreads, la clave es el PUNTO (ej: 2.5)
-                                    # Si es H2H, la clave es 'Moneyline' (todos compiten contra todos)
+                                    # La clave de agrupación: Point (handicap/total) o Moneyline
                                     key_point = out.get('point', 'Moneyline')
                                     
                                     if key_point not in grouped_odds:
                                         grouped_odds[key_point] = []
                                     
-                                    # Guardamos la cuota
                                     info = {
                                         'bookie': book['title'],
                                         'name': out['name'],
@@ -132,10 +124,10 @@ if btn_run and API_KEY and sport_key:
                                     }
                                     grouped_odds[key_point].append(info)
                     
-                    # Analizar cada grupo en busca de arbitraje
+                    # Analizar cada grupo
                     for g_key, options_list in grouped_odds.items():
                         
-                        # Paso 1: Encontrar la MEJOR cuota para cada opción
+                        # Encontrar MEJOR cuota por selección
                         best_in_market = {}
                         for opt in options_list:
                             sel_name = opt['name']
@@ -145,20 +137,16 @@ if btn_run and API_KEY and sport_key:
                                 if opt['price'] > best_in_market[sel_name]['price']:
                                     best_in_market[sel_name] = opt
                         
-                        # Paso 2: Verificar si hay suficientes lados para una apuesta
-                        # (Mínimo 2 lados para comparar)
+                        # Verificar arbitraje (mínimo 2 lados)
                         if len(best_in_market) >= 2:
                             final_odds = list(best_in_market.values())
-                            
-                            # Paso 3: Suma de inversas (Arbitraje Matemático)
                             arb_sum = sum(1 / item['price'] for item in final_odds)
                             
-                            # Paso 4: ¿Es Surebet? (< 1.0)
+                            # ¿Es Surebet?
                             if arb_sum < 1.0:
                                 profit = (1 - arb_sum) / arb_sum * 100
                                 
                                 if profit >= min_profit:
-                                    # Formatear salida
                                     bets_text = []
                                     for bo in final_odds:
                                         txt = f"{bo['name']} ({bo['bookie']}) @ {bo['price']}"
@@ -169,5 +157,22 @@ if btn_run and API_KEY and sport_key:
                                     opportunities.append({
                                         "Fecha": fecha,
                                         "Evento": ev_name,
-                                        "Selección": g_key, # Muestra el punto (ej: Over 2.5)
-                                        "Beneficio":
+                                        "Selección": g_key,
+                                        "Beneficio": f"{profit:.2f}%",
+                                        "Apuestas": full_bet_str
+                                    })
+                
+                # Mostrar resultados
+                if opportunities:
+                    st.success(f"¡{len(opportunities)} Oportunidades Encontradas!")
+                    df = pd.DataFrame(opportunities)
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.warning("No se encontraron surebets con estos filtros.")
+                    
+                with st.expander("Ver respuesta de API (Debug)"):
+                    st.write(f"Eventos analizados: {len(odds_data)}")
+                    st.json(odds_data)
+
+        except Exception as e:
+            st.error(f"Error Crítico: {e}")
