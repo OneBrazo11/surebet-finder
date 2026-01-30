@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 
+# Configuración de página
 st.set_page_config(page_title="Pixel Trader Sniper V8 🚀", layout="wide")
 st.title("🚀 Pixel Trader Sniper - Estación de Trabajo")
 
@@ -143,6 +144,7 @@ def get_arbitrage(outcomes, market_name):
             if opt['name'] not in best or opt['price'] > best[opt['name']]['price']:
                 best[opt['name']] = opt
         
+        # Filtro de seguridad para mercados
         if len(best) >= 2: 
             sides = list(best.values())
             arb_sum = sum(1/s['price'] for s in sides)
@@ -188,4 +190,14 @@ if run_analysis and API_KEY and sport_key:
             if all_opps:
                 st.success(f"¡{len(all_opps)} Oportunidades!")
                 df = pd.DataFrame(all_opps)
-                cols = ['Fecha', 'Evento', 'Mercado', 'Beneficio %',
+                # AQUÍ ESTABA TU ERROR ANTES, AHORA ESTÁ CORREGIDO:
+                cols = ['Fecha', 'Evento', 'Mercado', 'Beneficio %', 'Apuestas a realizar']
+                st.dataframe(df[cols], use_container_width=True)
+            else:
+                st.warning("No se encontraron Gaps rentables con estos filtros.")
+            
+            with st.expander("Ver Datos Crudos (Debug)"):
+                st.json(data)
+
+        except Exception as e:
+            st.error(f"Error: {e}")
