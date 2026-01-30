@@ -3,9 +3,9 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACION V9.0 ---
-st.set_page_config(layout="wide", page_title="Sniper V9.0")
-st.title("⚡ Sniper V9.0 - ACTIVO")
+# --- CONFIGURACION V9.1 ---
+st.set_page_config(layout="wide", page_title="Sniper V9.1 Global")
+st.title("⚡ Sniper V9.1 - GLOBAL")
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -43,7 +43,6 @@ with st.sidebar:
             st.error("¡Falta la API Key!")
         else:
             try:
-                # Conexión directa y simple
                 r = requests.get(f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}")
                 data = r.json()
                 if isinstance(data, list):
@@ -61,20 +60,31 @@ with st.sidebar:
         sel = st.selectbox("Liga:", lista)
         sport_key = st.session_state['sports'][sel]
 
-    region = st.selectbox("Región", ["us", "uk", "eu", "au"])
-    # AQUI ESTAN TUS MERCADOS FALTANTES
-    mercado = st.selectbox("Mercado", ["h2h", "spreads", "totals", "draw_no_bet", "double_chance"])
+    # Selector Regiones
+    mapa_regiones = {
+        "Global (Todas)": "us,uk,eu,au",
+        "Europa (EU)": "eu",
+        "USA (US)": "us",
+        "Reino Unido (UK)": "uk",
+        "Latam/Aus (AU)": "au"
+    }
+    region_label = st.selectbox("Región", list(mapa_regiones.keys()))
+    region_code = mapa_regiones[region_label]
+    
+    # Selector Mercados (Aquí se te cortaba antes)
+    lista_mercados = ["h2h", "spreads", "totals", "draw_no_bet", "double_chance"]
+    mercado = st.selectbox("Mercado", lista_mercados)
+    
     min_pct = st.slider("Min %", 0.0, 10.0, 0.0)
     btn_buscar = st.button("🔎 BUSCAR AHORA")
-
-# --- MOTOR PRINCIPAL ---
+    # --- MOTOR PRINCIPAL ---
 if btn_buscar and API_KEY and sport_key:
-    with st.spinner("Escaneando mercado..."):
+    with st.spinner(f"Escaneando en {region_label}..."):
         try:
             url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
             params = {
                 'apiKey': API_KEY,
-                'regions': region,
+                'regions': region_code,
                 'markets': mercado,
                 'oddsFormat': 'decimal'
             }
@@ -86,7 +96,7 @@ if btn_buscar and API_KEY and sport_key:
             else:
                 resultados = []
                 for ev in data:
-                    # Extracción segura de fecha
+                    # Fecha
                     fecha = ev.get('commence_time', '').replace('T', ' ').replace('Z', '')
                     evento = f"{ev['home_team']} vs {ev['away_team']}"
                     
@@ -96,9 +106,10 @@ if btn_buscar and API_KEY and sport_key:
                         for m in book['markets']:
                             if m['key'] == mercado:
                                 for out in m['outcomes']:
-                                    sel = out.get('point', out['name']) # Nombre o Puntos
+                                    sel = out.get('point', out['name'])
                                     if sel not in cuotas: cuotas[sel] = []
-                                    cuotas[sel].append({'bookie': book['title'], 'price': out['price'], 'name': out['name']})
+                                    item = {'bookie': book['title'], 'price': out['price'], 'name': out['name']}
+                                    cuotas[sel].append(item)
                     
                     # Calcular Arbitraje
                     for sel, opciones in cuotas.items():
@@ -111,10 +122,9 @@ if btn_buscar and API_KEY and sport_key:
                             lados = list(best.values())
                             suma = sum(1/x['price'] for x in lados)
                             
-                            # Validar si es una surebet real
                             es_valido = False
                             if suma < 1.0:
-                                if mercado == 'h2h' and len(best) >= 2: es_valido = True # Acepta 2 (Tenis) o 3 (Futbol)
+                                if mercado == 'h2h' and len(best) >= 2: es_valido = True
                                 elif mercado == 'double_chance' and len(best) >= 3: es_valido = True
                                 elif mercado in ['spreads', 'totals', 'draw_no_bet'] and len(best) >= 2: es_valido = True
                             
