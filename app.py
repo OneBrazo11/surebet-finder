@@ -4,86 +4,60 @@ import pandas as pd
 from datetime import datetime
 
 # --- CONFIGURACION ---
-st.set_page_config(layout="wide")
-st.title("Sniper V8.6 - Modo Seguro")
+st.set_page_config(layout="wide", page_title="Sniper V8.7")
+st.title("🚀 Sniper V8.7 - Final")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.header("1. Credenciales")
-    raw = st.text_input("API Key", type="password")
-    
-    # Limpieza segura
-    if raw:
-        API_KEY = raw.strip()
-    else:
-        API_KEY = ""
+    raw_key = st.text_input("API Key", type="password")
+    API_KEY = raw_key.strip() if raw_key else ""
     
     # --- CALCULADORA ---
-    with st.expander("Calculadora", expanded=True):
-        m1 = "2 Opciones (Tenis)"
-        m2 = "3 Opciones (Futbol)"
-        modo = st.radio("Modo:", [m1, m2])
-        
+    with st.expander("🧮 Calculadora", expanded=True):
+        modos = ["2 Opciones (Tenis)", "3 Opciones (Futbol)"]
+        modo = st.radio("Modo:", modos)
         bank = st.number_input("Bank ($)", value=100.0)
         
-        if modo == m1:
-            # MODO 2 VIAS
-            cA = st.number_input("Cuota A", value=2.0)
-            cB = st.number_input("Cuota B", value=2.0)
-            
-            if cA > 0 and cB > 0:
-                inv = (1/cA + 1/cB)
-                gana = (bank / inv) - bank
-                
-                st.write(f"Ganancia: ${gana:.2f}")
-                
-                sA = (bank * (1/cA)) / inv
-                sB = (bank * (1/cB)) / inv
-                
-                c1, c2 = st.columns(2)
-                c1.metric("Apostar A", f"${sA:.0f}")
-                c2.metric("Apostar B", f"${sB:.0f}")
-
+        if modo == modos[0]:
+            c1 = st.number_input("Cuota A", value=2.0)
+            c2 = st.number_input("Cuota B", value=2.0)
+            if c1 > 0 and c2 > 0:
+                inv = (1/c1 + 1/c2)
+                gan = (bank / inv) - bank
+                st.write(f"Ganancia: :green[${gan:.2f}]")
+                s1 = (bank/c1)/inv
+                s2 = (bank/c2)/inv
+                c_a, c_b = st.columns(2)
+                c_a.metric("A", f"${s1:.0f}")
+                c_b.metric("B", f"${s2:.0f}")
         else:
-            # MODO 3 VIAS
-            cL = st.number_input("Local", value=2.5)
-            cE = st.number_input("Empate", value=3.2)
-            cV = st.number_input("Visita", value=3.0)
-            
-            if cL > 0 and cE > 0 and cV > 0:
-                inv = (1/cL + 1/cE + 1/cV)
-                gana = (bank / inv) - bank
-                
-                st.write(f"Ganancia: ${gana:.2f}")
-                
-                sL = (bank * (1/cL)) / inv
-                sE = (bank * (1/cE)) / inv
-                sV = (bank * (1/cV)) / inv
-                
+            c1 = st.number_input("Local", value=2.5)
+            c2 = st.number_input("Empate", value=3.2)
+            c3 = st.number_input("Visita", value=3.0)
+            if c1 > 0 and c2 > 0 and c3 > 0:
+                inv = (1/c1 + 1/c2 + 1/c3)
+                gan = (bank / inv) - bank
+                st.write(f"Ganancia: :green[${gan:.2f}]")
+                s1 = (bank/c1)/inv
+                s2 = (bank/c2)/inv
+                s3 = (bank/c3)/inv
                 k1, k2, k3 = st.columns(3)
-                k1.metric("L", f"${sL:.0f}")
-                k2.metric("E", f"${sE:.0f}")
-                k3.metric("V", f"${sV:.0f}")
+                k1.metric("L", f"${s1:.0f}")
+                k2.metric("E", f"${s2:.0f}")
+                k3.metric("V", f"${s3:.0f}")
 
-    # --- CARGA LIGAS ---
+    # --- CARGAR LIGAS ---
     st.header("2. Escaner")
-    
-    # Inicializar memoria
     if 'sports' not in st.session_state:
         st.session_state['sports'] = {}
 
     if API_KEY:
-        if st.button("Cargar Ligas"):
+        if st.button("🔄 Cargar Ligas"):
             try:
-                # URL partida para seguridad
-                host = "https://api.the-odds-api.com"
-                ruta = "/v4/sports/"
-                url = f"{host}{ruta}"
-                
-                # Parametros
-                p = {}
-                p['apiKey'] = API_KEY
-                
+                url = "https://api.the-odds-api.com/v4/sports/"
+                # AQUI ESTA LA CORRECCION DEL ERROR 'APIKEY':
+                p = {'apiKey': API_KEY}
                 r = requests.get(url, params=p)
                 data = r.json()
                 
@@ -91,14 +65,10 @@ with st.sidebar:
                     temp = {}
                     for x in data:
                         if x['active']:
-                            k = x['key']
-                            t = x['title']
-                            g = x['group']
-                            nom = f"{g} - {t}"
-                            temp[nom] = k
-                            
+                            label = f"{x['group']} - {x['title']}"
+                            temp[label] = x['key']
                     st.session_state['sports'] = temp
-                    st.success("Exito")
+                    st.success("¡Cargado!")
                 else:
                     st.error(f"Error: {data}")
             except Exception as e:
@@ -111,172 +81,125 @@ with st.sidebar:
         sel = st.selectbox("Liga:", lista)
         sport_key = st.session_state['sports'][sel]
 
-    # Regiones
     regs = ["Global (Todas)", "Europa (EU)", "USA (US)", "Latam (AU)"]
     r_sel = st.selectbox("Region", regs)
-    
-    mapa = {}
-    mapa["Global (Todas)"] = "us,uk,eu,au"
-    mapa["Europa (EU)"] = "eu"
-    mapa["USA (US)"] = "us"
-    mapa["Latam (AU)"] = "au"
-    
-    # Mercados
-    mercs = ["h2h", "spreads", "totals", "draw_no_bet", "double_chance"]
-    m_tipo = st.selectbox("Mercado", mercs)
-    
-    min_p = st.slider("Min %", 0.0, 10.0, 0.0) 
-    
-    btn = st.button("Buscar")
+    mapa = {
+        "Global (Todas)": "us,uk,eu,au",
+        "Europa (EU)": "eu",
+        "USA (US)": "us",
+        "Latam (AU)": "au"
+    }
 
-# --- LOGICA ---
-def escanear(libros, tipo_mercado):
-    grupo = {}
+    # AQUI ESTAN TUS MERCADOS FALTANTES:
+    mis_mercados = [
+        "h2h", 
+        "spreads", 
+        "totals", 
+        "draw_no_bet", 
+        "double_chance"
+    ]
+    m_tipo = st.selectbox("Mercado", mis_mercados)
     
-    for l in libros:
-        # l es el bookmaker
-        bookie = l['title']
-        
-        for m in l['markets']:
-            # Verificamos mercado
-            clave = m['key']
-            
-            # AQUI FALLABA ANTES, AHORA ESTA SEGURO:
-            if clave == tipo_mercado:
-                
+    min_p = st.slider("Min %", 0.0, 10.0, 0.0)
+    btn = st.button("🔎 Buscar")# --- LOGICA DEL ESCANER ---
+def escanear(bookmakers, m_target):
+    grupo = {}
+    for book in bookmakers:
+        for m in book['markets']:
+            if m['key'] == m_target:
                 for out in m['outcomes']:
                     nom = out['name']
                     pr = out['price']
+                    # Usamos point para spreads/totals, o 'ML'
                     pt = out.get('point', 'ML')
                     
-                    if pt not in grupo:
-                        grupo[pt] = []
+                    if pt not in grupo: grupo[pt] = []
                     
-                    item = {}
-                    item['bookie'] = bookie
-                    item['name'] = nom
-                    item['price'] = pr
-                    
+                    item = {'bookie': book['title'], 'name': nom, 'price': pr}
                     grupo[pt].append(item)
     
     filas = []
-    
-    for punto, lista in grupo.items():
-        # Buscar mejor cuota
-        mejores = {}
-        for x in lista:
-            n = x['name']
-            p = x['price']
-            
-            if n not in mejores:
-                mejores[n] = x
-            elif p > mejores[n]['price']:
-                mejores[n] = x
+    for punto, opciones in grupo.items():
+        mejor = {}
+        for op in opciones:
+            n = op['name']
+            if n not in mejor or op['price'] > mejor[n]['price']:
+                mejor[n] = op
         
-        # Validar
-        count = len(mejores)
+        count = len(mejor)
         if count >= 2:
-            objs = list(mejores.values())
-            suma = 0
-            for o in objs:
-                suma += (1 / o['price'])
+            lados = list(mejor.values())
+            suma = sum(1/x['price'] for x in lados)
             
+            valido = False
             if suma < 1.0:
-                # Validacion estricta partida
-                ok = False
-                
-                if tipo_mercado == 'h2h':
-                    if count >= 2: ok = True
-                
-                if tipo_mercado == 'double_chance':
-                    if count >= 3: ok = True
+                # Reglas de validacion
+                if m_target == 'h2h':
+                    valido = True if count >= 2 else False
+                elif m_target == 'double_chance':
+                    valido = True if count >= 3 else False
+                else:
+                    # Spreads, Totals, DNB
+                    valido = True if count >= 2 else False
+            
+            if valido and suma < 1.0:
+                margen = (1 - suma) / suma * 100
+                if margen >= min_p:
+                    txts = []
+                    for b in lados:
+                        t = f"{b['name']}: {b['bookie']} @ {b['price']}"
+                        txts.append(t)
                     
-                if tipo_mercado in ['spreads', 'totals', 'draw_no_bet']:
-                    if count >= 2: ok = True
-                
-                if ok:
-                    margen = (1 - suma) / suma
-                    pct = margen * 100
-                    
-                    if pct >= min_p:
-                        # Crear texto
-                        txts = []
-                        for b in objs:
-                            b_n = b['bookie']
-                            b_p = b['price']
-                            b_s = b['name']
-                            t = f"{b_s}: {b_n} @ {b_p}"
-                            txts.append(t)
-                        
-                        fin = {}
-                        fin['Mercado'] = tipo_mercado
-                        fin['Sel'] = punto
-                        fin['%'] = round(pct, 2)
-                        fin['Apuestas'] = " | ".join(txts)
-                        
-                        filas.append(fin)
+                    filas.append({
+                        "Mercado": m_target,
+                        "Sel": punto,
+                        "Beneficio %": round(margen, 2),
+                        "Apuestas": " | ".join(txts)
+                    })
     return filas
 
 # --- EJECUCION ---
 if btn and API_KEY and sport_key:
-    with st.spinner("Buscando..."):
+    with st.spinner("Escaneando..."):
         try:
-            # Construir URL
-            base = "https://api.the-odds-api.com"
-            camino = f"/v4/sports/{sport_key}/odds"
-            link = f"{base}{camino}"
+            url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
+            params = {
+                'apiKey': API_KEY,
+                'regions': mapa[r_sel],
+                'markets': m_tipo,
+                'oddsFormat': 'decimal'
+            }
+            r = requests.get(url, params=params)
+            data = r.json()
             
-            # Parametros
-            reg_code = mapa[r_sel]
-            
-            par = {}
-            par['apiKey'] = API_KEY
-            par['regions'] = reg_code
-            par['markets'] = m_tipo
-            par['oddsFormat'] = 'decimal'
-            
-            res = requests.get(link, params=par)
-            datos = res.json()
-            
-            if not isinstance(datos, list):
-                st.error(f"Error: {datos}")
+            if not isinstance(data, list):
+                st.error(f"Error API: {data}")
             else:
                 todo = []
-                for ev in datos:
-                    h = ev['home_team']
-                    a = ev['away_team']
-                    tit = f"{h} vs {a}"
-                    
-                    # Fecha
-                    raw = ev.get('commence_time', '')
+                for ev in data:
+                    tit = f"{ev['home_team']} vs {ev['away_team']}"
+                    raw_d = ev.get('commence_time', '')
                     try:
-                        f1 = "%Y-%m-%dT%H:%M:%SZ"
-                        dt = datetime.strptime(raw, f1)
-                        f2 = "%Y-%m-%d %H:%M"
-                        fecha = dt.strftime(f2)
+                        dt = datetime.strptime(raw_d, "%Y-%m-%dT%H:%M:%SZ")
+                        fecha = dt.strftime("%Y-%m-%d %H:%M")
                     except:
-                        fecha = raw
-
-                    # Procesar
-                    books = ev['bookmakers']
-                    gaps = escanear(books, m_tipo)
+                        fecha = raw_d
                     
+                    gaps = escanear(ev['bookmakers'], m_tipo)
                     for g in gaps:
                         g['Evento'] = tit
                         g['Fecha'] = fecha
                         todo.append(g)
                 
                 if todo:
-                    st.success(f"{len(todo)} Oportunidades")
+                    st.success(f"¡{len(todo)} Oportunidades!")
                     df = pd.DataFrame(todo)
-                    
-                    cols = ['Fecha','Evento','%','Apuestas']
+                    cols = ['Fecha', 'Evento', 'Mercado', 'Beneficio %', 'Apuestas']
                     st.dataframe(df[cols], use_container_width=True)
                 else:
-                    st.warning("Nada por ahora")
+                    st.warning("Sin oportunidades.")
                 
-                with st.expander("Ver Datos"):
-                    st.json(datos)
-
+                with st.expander("Debug"):
+                    st.json(data)
         except Exception as e:
-            st.error(f"Error Critico: {e}")
+            st.error(f"Error critico: {e}")
