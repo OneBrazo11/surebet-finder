@@ -5,7 +5,7 @@ from datetime import datetime
 
 # --- CONFIGURACIÓN V14: FILTRO ECUADOR ---
 st.set_page_config(layout="wide", page_title="Sniper V14 - Ecuador")
-st.title("🇪🇨 Sniper V14 - Filtro Personalizado")
+st.title("🇪🇨 Sniper V11 - FINALE FINALE")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
