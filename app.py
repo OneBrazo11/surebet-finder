@@ -155,6 +155,13 @@ if btn_buscar and API_KEY and sport_key:
                 
                 if oportunidades:
                     st.success(f"¡{len(oportunidades)} Oportunidades!")
+                    # --- DETECTOR DE CASAS ---
+                    casas_encontradas = set()
+                    for ev in data:
+                        for book in ev['bookmakers']:
+                            casas_encontradas.add(book['title'])
+                    st.info(f"Casas escaneadas en esta búsqueda: {', '.join(casas_encontradas)}")
+                    # -------------------------
                     st.dataframe(pd.DataFrame(oportunidades), use_container_width=True)
                 else:
                     st.warning("No hay oportunidades ahora mismo.")
