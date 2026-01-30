@@ -5,7 +5,7 @@ from datetime import datetime
 
 # --- 1. CONFIGURACIÓN INICIAL ---
 st.set_page_config(
-    page_title="Pixel Trader V8.3", 
+    page_title="Pixel Trader V8.4", 
     layout="wide"
 )
 st.title("🚀 Pixel Trader Sniper - Estación de Trabajo")
@@ -13,7 +13,9 @@ st.title("🚀 Pixel Trader Sniper - Estación de Trabajo")
 # --- 2. BARRA LATERAL ---
 with st.sidebar:
     st.header("Credenciales")
-    API_KEY = st.text_input("Tu API Key", type="password")
+    # Limpiamos espacios en blanco por si acaso
+    raw_key = st.text_input("Tu API Key", type="password")
+    API_KEY = raw_key.strip() if raw_key else ""
     
     # --- CALCULADORA DE STAKES ---
     with st.expander("🧮 Calculadora Stakes", expanded=True):
@@ -74,7 +76,7 @@ with st.sidebar:
         yield_d = st.number_input("Rentabilidad %", value=1.5)
         dias = st.slider("Días", 30, 365, 30)
         
-        # Cálculos partidos para evitar líneas largas
+        # Cálculos seguros
         factor = (1 + yield_d/100)
         final = ini * (factor ** dias)
         neto = final - ini
@@ -95,27 +97,28 @@ with st.sidebar:
     if API_KEY:
         if st.button("🔄 Actualizar Ligas"):
             try:
-                # URL partida
-                host = "https://api.the-odds-api.com"
-                path = "/v4/sports/"
-                full_url = f"{host}{path}"
+                # URL Base
+                url_base = "https://api.the-odds-api.com/v4/sports/"
                 
-                res = requests.get(f"{full_url}?api_key={API_KEY}")
+                # Parametros seguros
+                p = {'apiKey': API_KEY}
+                
+                res = requests.get(url_base, params=p)
                 data = res.json()
                 
                 if isinstance(data, list):
-                    # Diccionario por comprensión vertical
+                    # Diccionario vertical
                     new_list = {
                         f"{x['group']} - {x['title']}": x['key']
                         for x in data 
                         if x['active']
                     }
                     st.session_state['sports_list'] = new_list
-                    st.success("¡Listo!")
+                    st.success("¡Conexión Exitosa!")
                 else:
                     st.error(f"Error API: {data}")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error de Conexión: {e}")
 
     # --- FILTROS ---
     if st.session_state['sports_list']:
@@ -192,7 +195,7 @@ def procesar(bookmakers, mercado):
             
             valido = False
             if suma_arb < 1.0:
-                # Condiciones partidas para no cortar línea
+                # Condiciones verticales
                 c1 = (mercado == 'h2h' and len(mejor) == 3)
                 c2 = (mercado == 'double_chance' and len(mejor) >= 3)
                 c3 = (mercado in ['spreads', 'totals', 'draw_no_bet'])
@@ -204,86 +207,3 @@ def procesar(bookmakers, mercado):
             if valido:
                 margen = (1 - suma_arb) / suma_arb * 100
                 if margen >= min_p:
-                    # Crear texto de apuestas verticalmente
-                    txt_bets = []
-                    for s in lados:
-                        b_name = s['bookie']
-                        b_odds = s['price']
-                        b_sel = s['name']
-                        txt_bets.append(f"{b_sel}: {b_name} @ {b_odds}")
-                    
-                    resultados.append({
-                        "Mercado": mercado,
-                        "Selección": pt,
-                        "Beneficio %": round(margen, 2),
-                        "Apuestas": " | ".join(txt_bets)
-                    })
-    return resultados
-
-# --- 4. EJECUCIÓN ---
-if btn_scan and API_KEY and sport_key:
-    with st.spinner(f"Analizando {sport_key}..."):
-        try:
-            # URL construida por partes
-            host = "https://api.the-odds-api.com"
-            path = f"/v4/sports/{sport_key}/odds"
-            url_final = f"{host}{path}"
-            
-            mis_params = {
-                'api_key': API_KEY,
-                'regions': mapa_reg[region_mode],
-                'markets': m_type,
-                'oddsFormat': 'decimal'
-            }
-            
-            r = requests.get(url_final, params=mis_params)
-            data = r.json()
-            
-            # Protección contra error de API
-            if not isinstance(data, list):
-                st.error(f"API Error: {data}")
-            else:
-                final_rows = []
-                for ev in data:
-                    home = ev['home_team']
-                    away = ev['away_team']
-                    titulo = f"{home} vs {away}"
-                    
-                    # Fecha segura
-                    raw_d = ev.get('commence_time', '')
-                    try:
-                        f_fmt = "%Y-%m-%dT%H:%M:%SZ"
-                        obj_d = datetime.strptime(raw_d, f_fmt)
-                        fecha = obj_d.strftime("%Y-%m-%d %H:%M")
-                    except:
-                        fecha = raw_d
-
-                    gaps = procesar(ev['bookmakers'], m_type)
-                    
-                    for g in gaps:
-                        g['Evento'] = titulo
-                        g['Fecha'] = fecha
-                        final_rows.append(g)
-                
-                if final_rows:
-                    st.success(f"{len(final_rows)} Oportunidades")
-                    df = pd.DataFrame(final_rows)
-                    
-                    # Columnas definidas verticalmente
-                    cols = [
-                        'Fecha',
-                        'Evento',
-                        'Mercado',
-                        'Beneficio %',
-                        'Apuestas'
-                    ]
-                    
-                    st.dataframe(df[cols], use_container_width=True)
-                else:
-                    st.warning("Sin oportunidades.")
-                
-                with st.expander("Debug"):
-                    st.json(data)
-
-        except Exception as e:
-            st.error(f"Error Python: {e}")
