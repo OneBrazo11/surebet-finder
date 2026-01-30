@@ -5,7 +5,7 @@ from datetime import datetime
 
 # --- CONFIGURACIÓN V14.2: BET365 + DAZN ---
 st.set_page_config(layout="wide", page_title="Sniper V14 - Ecuador")
-st.title("🇪🇨 Sniper V11.29 - FINALE FINALE")
+st.title("SCANNER V11.29 - FINALE FINALE")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -43,10 +43,11 @@ with st.sidebar:
     
     # Lista ampliada con DAZN Bet
     casas_posibles = [
-        "Pinnacle", "1xBet", "Betsson", "Betway", "Unibet", 
+        "Pinnacle", "1xBet", "Betsson", "Betway", "BetOnline.ag", 
         "Betfair", "Marathon Bet", "Coolbet", "William Hill", 
         "Matchbook", "888sport", "Bet365", "DAZN Bet", 
-        "BetOnline.ag", "Smarkets", "Dafabet", "Nordic Bet", "LeoVegas"
+        "BetOnline.ag", "Smarkets", "Dafabet", "Nordic Bet", "LeoVegas" , 
+        "BetUS" , "MyBookie.ag" , "LowVig.ag" , "Matchbook" , "Smarkets"
     ]
     
     # SELECCIÓN AUTOMÁTICA (Incluye Bet365 y DAZN Bet)
