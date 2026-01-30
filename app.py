@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 # Configuración de página
-st.set_page_config(page_title="Pixel Trader Sniper V8 🚀", layout="wide")
+st.set_page_config(page_title="Pixel Trader Sniper V8.1 🚀", layout="wide")
 st.title("🚀 Pixel Trader Sniper - Estación de Trabajo")
 
 # --- BARRA LATERAL (CONFIGURACIÓN + CALCULADORAS) ---
@@ -17,7 +17,7 @@ with st.sidebar:
         st.caption("Calcula cuánto apostar para ganar seguro.")
         
         calc_mode = st.radio("Tipo de Apuesta", ["2 Opciones (Tenis/DNB/Totales)", "3 Opciones (1X2 Fútbol)"])
-        total_bank = st.number_input("Inversión Total ($)", value=100, step=10)
+        total_bank = st.number_input("Inversión Total ($)", value=100.0, step=10.0)
         
         if calc_mode == "2 Opciones (Tenis/DNB/Totales)":
             c1 = st.number_input("Cuota A", value=2.00, step=0.01)
@@ -93,10 +93,14 @@ with st.sidebar:
                 r = requests.get(f"https://api.the-odds-api.com/v4/sports/?api_key={API_KEY}")
                 r.raise_for_status()
                 data = r.json()
-                st.session_state['sports_list'] = {f"{x['group']} - {x['title']}": x['key'] for x in data if x['active']}
-                st.success("¡Ligas cargadas!")
+                # Validación extra por si la API da error
+                if isinstance(data, list):
+                    st.session_state['sports_list'] = {f"{x['group']} - {x['title']}": x['key'] for x in data if x['active']}
+                    st.success("¡Ligas cargadas!")
+                else:
+                    st.error(f"Error de API: {data}")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error conectando: {e}")
 
     if st.session_state['sports_list']:
         sorted_labels = sorted(st.session_state['sports_list'].keys())
@@ -144,7 +148,6 @@ def get_arbitrage(outcomes, market_name):
             if opt['name'] not in best or opt['price'] > best[opt['name']]['price']:
                 best[opt['name']] = opt
         
-        # Filtro de seguridad para mercados
         if len(best) >= 2: 
             sides = list(best.values())
             arb_sum = sum(1/s['price'] for s in sides)
@@ -173,31 +176,19 @@ if run_analysis and API_KEY and sport_key:
             url = f'https://api.the-odds-api.com/v4/sports/{sport_key}/odds'
             params = {'api_key': API_KEY, 'regions': reg_map[region_mode], 'markets': market_type, 'oddsFormat': 'decimal'}
             
-            data = requests.get(url, params=params).json()
-            all_opps = []
+            response = requests.get(url, params=params)
+            data = response.json()
             
-            for event in data:
-                opps = get_arbitrage(event['bookmakers'], market_type)
-                try:
-                    dt = datetime.strptime(event['commence_time'], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M")
-                except: dt = event['commence_time']
-
-                for op in opps:
-                    op['Evento'] = f"{event['home_team']} vs {event['away_team']}"
-                    op['Fecha'] = dt
-                    all_opps.append(op)
-            
-            if all_opps:
-                st.success(f"¡{len(all_opps)} Oportunidades!")
-                df = pd.DataFrame(all_opps)
-                # AQUÍ ESTABA TU ERROR ANTES, AHORA ESTÁ CORREGIDO:
-                cols = ['Fecha', 'Evento', 'Mercado', 'Beneficio %', 'Apuestas a realizar']
-                st.dataframe(df[cols], use_container_width=True)
+            # --- CORRECCIÓN IMPORTANTE: VERIFICAR SI LA RESPUESTA ES VÁLIDA ---
+            if not isinstance(data, list):
+                # Si data no es una lista, es un mensaje de error (ej. Cuota excedida)
+                st.error(f"La API devolvió un mensaje: {data}")
             else:
-                st.warning("No se encontraron Gaps rentables con estos filtros.")
-            
-            with st.expander("Ver Datos Crudos (Debug)"):
-                st.json(data)
-
-        except Exception as e:
-            st.error(f"Error: {e}")
+                all_opps = []
+                for event in data:
+                    opps = get_arbitrage(event['bookmakers'], market_type)
+                    
+                    # Manejo de fechas seguro
+                    try:
+                        raw_date = event['commence_time']
+                        dt = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H
